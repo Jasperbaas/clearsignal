@@ -1251,7 +1251,7 @@ function buildAssessPrompt(claims, pages, today) {
     '3. Verdict per claim: "supported" (the pages report it happened as stated), "contradicted" (the pages report it did not happen, or a fact-checker rates this claim, quote or footage false, fabricated, misleading or out of context), "mixed" (pages disagree, or support only part of it), "not_found" (no page addresses it).',
     "4. Evidence: 1 or 2 items per claim, each with a page id and an EXACT quote copied character for character from that page's text, at most 30 words. No exact quote means no evidence.",
     "5. Only use supported, contradicted or mixed when a page is about this same claim or event (a fact-check of the same viral claim or footage counts, even if it is older). A page about a similar but different or older event cannot decide the claim: use not_found and name that page as the closest reporting in the explanation.",
-    "6. explanation: at most 35 words, plain and neutral.",
+    "6. explanation: at most 35 words, plain and neutral. Name pages by their site (for example dw.com), never by their id.",
     "7. coverage_expected: true when, if the claim were true, major international news outlets would certainly have reported it by now (a war starting, a large attack, a leader killed, a city evacuated). false for small, local, private or opinion-like claims.",
     "8. debunked_by: the ids of pages that rate this same claim, quote or footage false, fabricated, misleading or out of context. Empty list if none.",
     "9. seen_before: when a page says this same claim, quote or footage already circulated or was debunked before (for example \"the same video was shared in 2023\"), give that page id and an EXACT quote of at most 30 words that contains the year or date. Otherwise null.",
@@ -1287,7 +1287,8 @@ function validateFactCheck(out, claims, pages) {
       const yr = loc ? (loc.text.match(/\b(19[89]\d|20[0-4]\d)\b/) || [])[1] : null;
       if (loc && yr && +yr <= new Date().getFullYear()) seenBefore = { year: +yr, quote: loc.text, url: p.url, host: p.host, title: p.title, date: p.date || "" };
     }
-    return { claim: c.claim, query: c.query, verdict, explanation: String(r.explanation || "").trim().slice(0, 320), evidence: evidence.slice(0, 2), debunks, seenBefore,
+    const named = String(r.explanation || "").trim().replace(/\[?\b(p\d{1,2})\b\]?/g, (m, id) => byId.get(id) ? byId.get(id).host : m).replace(/\b(\S+) and \1\b/g, "$1");
+    return { claim: c.claim, query: c.query, verdict, explanation: named.slice(0, 320), evidence: evidence.slice(0, 2), debunks, seenBefore,
       note: needsProof && !evidence.length ? "Claude's quote could not be found on the page, so no verdict is shown." : "" };
   });
   return { claims: res, summary: String(out && out.summary || "").trim().slice(0, 320) };
@@ -1746,6 +1747,8 @@ const V_ICON = { "factcheck-explorer": ["FC", "#3a63c4"], reuters: ["R", "#e8582
 let sample = null, downloads = null, mcp = null, imgLimits = null, sampleWait = null;
 /* The hosted app (clearsignal on Vercel) sets this; its server runs Claude and the search. */
 const HOSTED = !!window.__CLEARSIGNAL_HOSTED;
+/* the shortest text worth checking */
+const MIN_WORDS = 8;
 /* Claude tasks by name: the hosted app sends the task to its server, claude.ai builds the prompt here. */
 function aiStream(task, args, opts) { return sample.task ? sample.task(task, args, opts) : sample(M.PROMPTS[task](args), opts); }
 function aiJson(task, args, opts) { return sample.taskJson ? sample.taskJson(task, args, opts) : sample.json(M.PROMPTS[task](args), opts); }
@@ -1976,7 +1979,14 @@ function updateGo() {
   const st = $("#go-state"), b = $("#analyse");
   if (!st || !b) return;
   let ready = false, t = "";
-  if (tab === "text") { const w = words(draft.text); ready = w >= 8 && draft.text.length <= MAX; t = draft.text.length > MAX ? "Longer than 20,000 characters, shorten it" : w ? plural(w, "word", "words") + " ready to check" : "Paste a text or pick an example"; }
+  if (tab === "text") {
+    const w = words(draft.text), need = MIN_WORDS - w;
+    ready = w >= MIN_WORDS && draft.text.length <= MAX;
+    t = draft.text.length > MAX ? "Longer than 20,000 characters, shorten it"
+      : !w ? `Paste a text or pick an example, at least ${MIN_WORDS} words`
+      : need > 0 ? `${plural(w, "word", "words")}, add ${need} more to check (minimum ${MIN_WORDS})`
+      : plural(w, "word", "words") + " ready to check";
+  }
   else if (tab === "image") { ready = files.length > 0; t = files.length ? `${plural(files.length, "screenshot", "screenshots")} ready` : "Add a screenshot"; }
   else { ready = !!linkSrc; t = linkSrc ? "Page loaded" : "Load a page first"; }
   st.textContent = t;
@@ -2017,7 +2027,7 @@ async function analyse() {
   let src;
   if (tab === "text") {
     const text = draft.text.trim();
-    if (words(text) < 8) return msg1("This text is too short to assess. Paste at least a few sentences.", true);
+    if (words(text) < MIN_WORDS) return msg1(`This text is too short to assess. Paste at least ${MIN_WORDS} words, ideally a few sentences.`, true);
     src = exampleKey ? Object.assign(exampleSource(exampleKey), { text, title: draft.title || M.EXAMPLES[exampleKey].title }) : { kind: "text", tag: "Pasted text", title: draft.title.trim(), text };
   } else if (tab === "image") {
     if (!files.length) return msg1("Add a screenshot first.", true);
