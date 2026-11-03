@@ -11,7 +11,7 @@ module.exports = async (req, res) => {
     const queries = S.arr(b.search_queries, 3, "queries").map((q, k) => S.str(q, 140, "Query " + (k + 1), true));
     if (!queries.length) throw new S.ApiError(400, "bad_request", "No search query.");
     await S.limit(req, "search");
-    const payload = { objective, search_queries: queries, advanced_settings: { max_results: 10, excerpt_settings: { max_chars_per_result: 3000 } } };
+    const payload = { objective, search_queries: queries, max_chars_total: 30000, advanced_settings: { max_results: 10, excerpt_settings: { max_chars_per_result: 3000 } } };
     const mode = S.env("CS_SEARCH_MODE", "");
     if (mode) payload.mode = mode;
     const j = await S.parallel("/v1/search", payload);
