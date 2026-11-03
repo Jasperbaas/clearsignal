@@ -43,7 +43,7 @@ This is a rough estimate at list prices, with `claude-sonnet-5-5` for the signal
 - picking the claims with Haiku costs well under $0.001;
 - two or three Parallel searches cost about $0.01–0.015.
 
-That comes to roughly **$0.07–0.10 per check**, so 100 checks cost about $7–10. The same post checked again in the same browser within six hours is served from that browser's store and costs nothing.
+That comes to roughly **$0.07–0.10 per check**, so 100 checks cost about $7–10. Every press of Analyse runs a fresh check.
 
 ## Safety
 

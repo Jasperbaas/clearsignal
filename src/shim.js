@@ -1,7 +1,7 @@
 /* ClearSignal, hosted. The page was built to run inside claude.ai, where it asks the viewer's own
    Claude and connectors. Here the same page talks to this site's own server instead:
    Claude tasks go to /api/ai, web searches to /api/search, links to /api/fetch.
-   Answers are kept in this browser for six hours, so the same post gives the same check. */
+   Every check is fresh; a call that asks for caching may reuse an answer from the last six hours. */
 window.__CLEARSIGNAL_HOSTED = true;
 (() => {
   "use strict";
@@ -42,6 +42,7 @@ window.__CLEARSIGNAL_HOSTED = true;
     return { type: "image/jpeg", data };
   }
   const refreshing = o => !!(o && o.cache && o.cache.refresh);
+  const caching = o => !!(o && o.cache);
 
   /* sample: only named tasks; the server never takes a raw prompt */
   const sample = async () => { throw { code: "not_declared", message: "Use a named task." }; };
@@ -49,7 +50,7 @@ window.__CLEARSIGNAL_HOSTED = true;
   sample.limits = async () => ({ images: { maxCount: 4, maxInputBytes: 20000000, mediaTypes: ["image/png", "image/jpeg", "image/webp"] } });
   sample.task = async (task, args, o = {}) => {
     const key = await hash("ai|" + task + "|" + JSON.stringify(args));
-    if (!refreshing(o)) {
+    if (caching(o) && !refreshing(o)) {
       const hit = cacheGet(key);
       if (typeof hit === "string") { if (o.onText) o.onText({ text: hit, delta: hit }); return { text: hit, truncated: false }; }
     }
@@ -66,13 +67,13 @@ window.__CLEARSIGNAL_HOSTED = true;
         if (o.onText) o.onText({ text, delta });
       }
     } catch { throw { code: o.signal && o.signal.aborted ? "cancelled" : "upstream_error", text }; }
-    if (text.length > 200) cacheSet(key, text);
+    if (caching(o) && text.length > 200) cacheSet(key, text);
     return { text, truncated: false };
   };
   sample.taskJson = async (task, args, o = {}) => {
     const send = Object.assign({}, args);
     if (o.images && o.images.length) send.images = await Promise.all([...o.images].map(shrink));
-    const key = send.images ? null : await hash("ai|" + task + "|" + JSON.stringify(send));
+    const key = send.images || !caching(o) ? null : await hash("ai|" + task + "|" + JSON.stringify(send));
     if (key && !refreshing(o)) { const hit = cacheGet(key); if (hit !== undefined) return hit; }
     const r = await post("/api/ai", { task, args: send }, o.signal);
     const j = await r.json();

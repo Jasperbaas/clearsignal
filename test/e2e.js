@@ -48,13 +48,13 @@ const ENV = { ANTHROPIC_BASE_URL: "http://127.0.0.1:9101", PARALLEL_BASE_URL: "h
       await p.click('#s2 .tab2[data-tab="sig"]'); await wait(500);
       r1.sigRows = await p.$$eval("#s2 .sig-r", x => x.length);
       await p.screenshot({ path: `${OUT}/${tag}-2-signals.png` });
-      // 2. the same post again comes from this browser's store: same verdict, no new Claude calls
+      // 2. the same post again is checked afresh, and the page lands on Results
       const before = await (await fetch("http://127.0.0.1:9101/__log")).json();
       await p.click("#stepper li:first-child button"); await wait(500);
       await p.click("#analyse");
       await p.waitForFunction(() => document.querySelector("#s2 .fake") && !document.querySelector("#s2 .fake").classList.contains("pending"), null, { timeout: 30000 }); await wait(600);
       const after = await (await fetch("http://127.0.0.1:9101/__log")).json();
-      r1.repeat = { verdict: await p.textContent("#s2 .fake-t"), newUpstreamCalls: after.length - before.length };
+      r1.repeat = { verdict: await p.textContent("#s2 .fake-t"), newUpstreamCalls: after.length - before.length, onResults: await p.evaluate(() => document.querySelector('#stepper li:nth-child(2)').classList.contains('now')) };
       // 3. a link
       await p.click("#stepper li:first-child button"); await wait(500);
       await p.click(".seg-btn >> nth=2"); await p.fill("#src-url", "news.example.org/story"); await p.click("#load");

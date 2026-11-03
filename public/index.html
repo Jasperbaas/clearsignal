@@ -662,7 +662,7 @@ table.cmp { width: 100%; border-collapse: collapse; font-size: 14px; }
 /* ClearSignal, hosted. The page was built to run inside claude.ai, where it asks the viewer's own
    Claude and connectors. Here the same page talks to this site's own server instead:
    Claude tasks go to /api/ai, web searches to /api/search, links to /api/fetch.
-   Answers are kept in this browser for six hours, so the same post gives the same check. */
+   Every check is fresh; a call that asks for caching may reuse an answer from the last six hours. */
 window.__CLEARSIGNAL_HOSTED = true;
 (() => {
   "use strict";
@@ -703,6 +703,7 @@ window.__CLEARSIGNAL_HOSTED = true;
     return { type: "image/jpeg", data };
   }
   const refreshing = o => !!(o && o.cache && o.cache.refresh);
+  const caching = o => !!(o && o.cache);
 
   /* sample: only named tasks; the server never takes a raw prompt */
   const sample = async () => { throw { code: "not_declared", message: "Use a named task." }; };
@@ -710,7 +711,7 @@ window.__CLEARSIGNAL_HOSTED = true;
   sample.limits = async () => ({ images: { maxCount: 4, maxInputBytes: 20000000, mediaTypes: ["image/png", "image/jpeg", "image/webp"] } });
   sample.task = async (task, args, o = {}) => {
     const key = await hash("ai|" + task + "|" + JSON.stringify(args));
-    if (!refreshing(o)) {
+    if (caching(o) && !refreshing(o)) {
       const hit = cacheGet(key);
       if (typeof hit === "string") { if (o.onText) o.onText({ text: hit, delta: hit }); return { text: hit, truncated: false }; }
     }
@@ -727,13 +728,13 @@ window.__CLEARSIGNAL_HOSTED = true;
         if (o.onText) o.onText({ text, delta });
       }
     } catch { throw { code: o.signal && o.signal.aborted ? "cancelled" : "upstream_error", text }; }
-    if (text.length > 200) cacheSet(key, text);
+    if (caching(o) && text.length > 200) cacheSet(key, text);
     return { text, truncated: false };
   };
   sample.taskJson = async (task, args, o = {}) => {
     const send = Object.assign({}, args);
     if (o.images && o.images.length) send.images = await Promise.all([...o.images].map(shrink));
-    const key = send.images ? null : await hash("ai|" + task + "|" + JSON.stringify(send));
+    const key = send.images || !caching(o) ? null : await hash("ai|" + task + "|" + JSON.stringify(send));
     if (key && !refreshing(o)) { const hit = cacheGet(key); if (hit !== undefined) return hit; }
     const r = await post("/api/ai", { task, args: send }, o.signal);
     const j = await r.json();
@@ -1744,7 +1745,7 @@ const CREDITS = [
 ];
 const V_ICON = { "factcheck-explorer": ["FC", "#3a63c4"], reuters: ["R", "#e8582a"], afp: ["AFP", "#1d6352"], ap: ["AP", "#c42b26"], bellingcat: ["B", "#4a4f5c"], tineye: ["Ti", "#2f9466"], lens: ["L", "#b98508"], invid: ["IV", "#7a3b1c"], euvsdisinfo: ["EU", "#2b4fa3"], fullfact: ["FF", "#8a4fbf"] };
 
-let sample = null, downloads = null, mcp = null, imgLimits = null, sampleWait = null;
+let sample = null, downloads = null, mcp = null, imgLimits = null, sampleWait = null, runSeq = 0;
 /* The hosted app (clearsignal on Vercel) sets this; its server runs Claude and the search. */
 const HOSTED = !!window.__CLEARSIGNAL_HOSTED;
 /* the shortest text worth checking */
@@ -2045,10 +2046,11 @@ async function analyse() {
   const goB = $("#analyse"); goB.classList.add("launch");
   const ta = $("#txt"); if (ta) ta.classList.add("sent");
   updateGo(); renderLocked(); buildDesk(src); updateDesk(); refreshHeads();
-  setTimeout(() => { if (live) setOpen(2); }, REDUCED ? 0 : 340);
+  const run = ++runSeq;
+  setTimeout(() => { if (run === runSeq && (live || current) && openStep === 1) setOpen(2); }, REDUCED ? 0 : 340);
   try {
     if (src.kind === "image") {
-      const out = await aiJson("transcribe", { count: src.files.length }, { images: src.files, signal });
+      const out = await aiJson("transcribe", { count: src.files.length }, { images: src.files, signal, cache: false });
       const text = String(out && out.text || "").trim();
       if (words(text) < 3) throw { code: "no_text" };
       src.text = text.slice(0, MAX); src.notes = Array.isArray(out.visual_notes) ? out.visual_notes.map(String).slice(0, 4) : [];
@@ -2075,7 +2077,7 @@ async function analyse() {
     };
     const run = (ids, withQ) => {
       const parser = M.lineParser(accept(ids));
-      return aiStream("signals", { text, title: src.title, ids, withQ, notes: src.notes }, { signal, effort: "low", onText: ({ delta }) => parser.push(delta) })
+      return aiStream("signals", { text, title: src.title, ids, withQ, notes: src.notes }, { signal, effort: "low", cache: false, onText: ({ delta }) => parser.push(delta) })
         .then(res => { parser.end(); M.extractObjects((res && res.text) || "").forEach(accept(ids)); return res; });
     };
     const outcomes = await Promise.allSettled([run(M.BATCHES[0], false), run(M.BATCHES[1], true)]);
@@ -2093,10 +2095,11 @@ async function analyse() {
     rv.order = M.reviewOrder(res); rv.idx = 0; rv.done = false;
     busy = false; ctl = null;
     finishDesk(); renderS3(); renderS4(); refreshHeads(); updateGo();
+    if (openStep === 1) setOpen(2);
     const missing = indicators.filter(i => i.validationNote && i.validationNote.startsWith("No result")).length;
     if (missing) { D.note.textContent = `Part of the analysis did not finish, so ${plural(missing, "indicator is", "indicators are")} marked Unverified. Analyse again to complete them.`; D.note.hidden = false; }
   } catch (e) {
-    busy = false; ctl = null; live = null; current = prev;
+    busy = false; ctl = null; live = null; current = prev; runSeq++;
     const code = e && e.code;
     if (PERMANENT.includes(code)) sample = null;
     stopFact();
@@ -2245,8 +2248,7 @@ function showVerify(vl) {
 /* ---------- Fact check: Claude names the claims, the page searches and reads, Claude weighs what was read ---------- */
 let fc = null;
 const FC_MAX_READ = 4, FC_MAX_PAGES = 6;
-/* The same post gives the same check for six hours: claims, search results and verdicts are kept. "Search again" refreshes them. */
-const FC_KEEP = 6 * 3600 * 1000;
+/* Every Analyse is a fresh check: nothing is replayed from an earlier run. */
 const FC_STATE = { found: "Found", reading: "Reading", read: "Read" };
 function fcSnap() { return fc && fc.done && fc.result ? { date: fc.date, claims: fc.result.claims, summary: fc.result.summary, pages: fc.pages.map(p => ({ url: p.url, host: p.host, title: p.title, date: p.date || "" })) } : null; }
 function stopFact() { if (fc && fc.ctl) fc.ctl.abort(); }
@@ -2291,7 +2293,7 @@ async function searchClaim(c, signal, refresh, again) {
     const r = await mcp.callTool(SEARCH, "web_search", {
       objective: ("Find news reports or fact-checks that confirm or refute this claim: " + c.claim).slice(0, 480),
       search_queries: /fact.?check/i.test(c.query) ? [c.query] : [c.query, short + " fact check"]
-    }, { cache: refresh ? { staleTime: FC_KEEP, gcTime: FC_KEEP, refresh: true } : { staleTime: FC_KEEP, gcTime: FC_KEEP }, signal });
+    }, { cache: false, signal });
     return M.parallelResults(r.payload);
   } catch (e) {
     if (again || !(e && e.retryable)) throw e;
@@ -2375,7 +2377,7 @@ async function browserRoute(me, signal) {
 }
 async function runFactCheck(text, me) {
   const signal = me.ctl.signal;
-  const out = await aiJson("claims", { text, date: me.date }, { signal, modelTier: "quick", cache: me.refresh ? { gcTime: FC_KEEP, refresh: true } : { gcTime: FC_KEEP } });
+  const out = await aiJson("claims", { text, date: me.date }, { signal, modelTier: "quick", cache: false });
   if (fc !== me) return;
   me.claims = M.cleanClaims(out).map(c => Object.assign(c, { state: "queued", found: 0 }));
   if (!me.claims.length) { me.done = true; me.phase = "done"; me.status = "No checkable factual claim found in this post."; renderFact(); return; }
@@ -2390,7 +2392,7 @@ async function runFactCheck(text, me) {
   if (!routed) { if (!(await browserRoute(me, signal))) return; }
   if (!me.pages.length) { me.done = true; me.phase = "done"; me.status = me.foundN ? "No page could be read, so nothing was verified." : "No reporting about these claims turned up in the search, so nothing was verified."; renderFact(); fcAttach(); return; }
   me.phase = "assess"; me.status = `Weighing ${plural(me.claims.length, "claim", "claims")} against ${plural(me.pages.length, "page", "pages")}`; renderFact();
-  const verdict = await aiJson("assess", { claims: me.claims.map(c => ({ claim: c.claim, query: c.query })), pages: me.pages, date: me.date }, { signal, cache: me.refresh ? { gcTime: FC_KEEP, refresh: true } : { gcTime: FC_KEEP } });
+  const verdict = await aiJson("assess", { claims: me.claims.map(c => ({ claim: c.claim, query: c.query })), pages: me.pages, date: me.date }, { signal, cache: false });
   if (fc !== me) return;
   me.result = M.validateFactCheck(verdict, me.claims, me.pages);
   me.done = true; me.phase = "done";
