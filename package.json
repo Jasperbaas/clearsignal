@@ -1,0 +1,11 @@
+{
+  "name": "clearsignal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ClearSignal: check a war post before you share it. A live web fact check and 20 observable signals, with a human in the loop.",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "node dev-server.js"
+  }
+}
