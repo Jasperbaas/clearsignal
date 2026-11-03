@@ -224,6 +224,12 @@ textarea.txt:focus, .field input:focus, .note:focus { outline: none; border-colo
 .ex b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ex[aria-pressed="true"] { box-shadow: inset 0 0 0 1.5px var(--ink); }
 .go-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-top: 18px; border-top: 1px solid var(--rule); }
+.go-need { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1 1 280px; }
+.need-m { display: grid; grid-template-columns: repeat(8, 9px); gap: 3px; flex: none; }
+.need-m i { height: 9px; border-radius: 2px; background: var(--raise-3); box-shadow: inset 0 0 0 1px var(--rule-2); transition: background .2s, box-shadow .2s; }
+.need-m i.on { background: var(--ink); box-shadow: none; }
+.need-t { font-size: 14px; line-height: 1.4; color: var(--ink-2); }
+.need-t b { color: var(--ink); font-weight: 600; margin-right: 4px; }
 
 /* Step 2 */
 .live { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--ink-2); margin-bottom: 22px; }
@@ -1979,18 +1985,22 @@ function pickExample(k) {
 function updateGo() {
   const st = $("#go-state"), b = $("#analyse");
   if (!st || !b) return;
-  let ready = false, t = "";
+  let ready = false, t = "", need = 0, w = 0;
   if (tab === "text") {
-    const w = words(draft.text), need = MIN_WORDS - w;
+    w = words(draft.text); need = Math.max(0, MIN_WORDS - w);
     ready = w >= MIN_WORDS && draft.text.length <= MAX;
-    t = draft.text.length > MAX ? "Longer than 20,000 characters, shorten it"
-      : !w ? `Paste a text or pick an example, at least ${MIN_WORDS} words`
-      : need > 0 ? `${plural(w, "word", "words")}, add ${need} more to check (minimum ${MIN_WORDS})`
-      : plural(w, "word", "words") + " ready to check";
+    t = draft.text.length > MAX ? "Longer than 20,000 characters, shorten it" : plural(w, "word", "words") + " ready to check";
   }
   else if (tab === "image") { ready = files.length > 0; t = files.length ? `${plural(files.length, "screenshot", "screenshots")} ready` : "Add a screenshot"; }
   else { ready = !!linkSrc; t = linkSrc ? "Page loaded" : "Load a page first"; }
-  st.textContent = t;
+  /* too short: a meter of the minimum, filling up as the visitor types */
+  if (tab === "text" && need > 0 && draft.text.length <= MAX) {
+    st.className = "go-need";
+    st.replaceChildren(
+      el("span", { class: "need-m", "aria-hidden": "true" }, Array.from({ length: MIN_WORDS }, (_, k) => el("i", { class: k < w ? "on" : null }))),
+      el("span", { class: "need-t" }, el("b", null, w ? `Add ${need} more ${need === 1 ? "word" : "words"}` : `Paste at least ${MIN_WORDS} words`), w ? ` A check needs at least ${MIN_WORDS} words, you have ${w}.` : " or pick one of the examples below."));
+    b.title = `Add ${need} more ${need === 1 ? "word" : "words"} to check this text`;
+  } else { st.className = "small"; st.textContent = t; b.title = ""; }
   b.disabled = !ready || busy;
   b.classList.toggle("ready", ready && !busy);
   if (!busy) b.classList.remove("launch");
