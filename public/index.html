@@ -604,6 +604,36 @@ table.cmp { width: 100%; border-collapse: collapse; font-size: 14px; }
 .footer b { color: var(--ink-2); font-weight: 600; }
 .footer ul { margin: 6px 0 0; padding-left: 16px; }
 
+/* Why we built it: an intro beside a numbered editorial list */
+.about { padding-block: 100px 0; }
+.about-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 40px 64px; align-items: start; }
+.about-intro h2 { margin-top: 10px; font-weight: 700; font-size: clamp(30px, 3.8vw, 46px); line-height: 1.02; letter-spacing: -.035em; }
+.about-intro p { margin-top: 18px; color: var(--ink-2); max-width: 46ch; }
+.about-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--rule-2); counter-reset: ab; }
+.about-list li { counter-increment: ab; padding: 18px 22px 24px 0; border-bottom: 1px solid var(--rule); }
+.about-list li:nth-child(2n) { padding-left: 22px; padding-right: 0; border-left: 1px solid var(--rule); }
+.about-list li::before { content: counter(ab, decimal-leading-zero); display: block; margin-bottom: 12px; font-size: 13px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.about-list b { display: block; font-weight: 600; font-size: 17px; line-height: 1.3; letter-spacing: -.01em; }
+.about-list span { display: block; margin-top: 7px; color: var(--ink-3); font-size: 14.5px; line-height: 1.5; }
+
+/* Pricing: three plans side by side, divided by rules */
+.pricing { padding-block: 100px 0; }
+.plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--rule-2); }
+.plan { display: flex; flex-direction: column; padding: 22px 26px 28px; border-left: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.plan:first-child { border-left: 0; padding-left: 0; }
+.plan:last-child { padding-right: 0; }
+.plan h3 { font-weight: 600; font-size: 17px; letter-spacing: -.01em; }
+.plan .price { margin-top: 16px; display: flex; align-items: baseline; gap: 10px; }
+.plan .price b { font-weight: 800; font-size: 52px; line-height: 1; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
+.plan .price span { color: var(--ink-3); font-size: 14px; }
+.plan .for { margin-top: 14px; min-height: 3em; color: var(--ink-2); font-size: 14.5px; line-height: 1.5; }
+.plan ul { list-style: none; margin: 20px 0 28px; padding: 0; display: grid; gap: 10px; font-size: 14.5px; line-height: 1.4; }
+.plan li { display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: start; }
+.plan li::before { content: ""; width: 10px; height: 5px; margin-top: 5px; border-left: 2px solid var(--ink-2); border-bottom: 2px solid var(--ink-2); transform: rotate(-45deg); }
+.plan li.lead { color: var(--ink); font-weight: 600; }
+.plan .btn { margin-top: auto; align-self: flex-start; }
+.price-note { margin-top: 18px; max-width: 80ch; }
+
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } html { scroll-behavior: auto; } }
 @media (max-width: 1100px) {
   .read { gap: 28px; }
@@ -619,6 +649,10 @@ table.cmp { width: 100%; border-collapse: collapse; font-size: 14px; }
   .sig-grid > div:nth-child(2n+1) { border-left: 0; padding-left: 0; }
   .top-links { display: none; }
   .top .btn { margin-left: auto; }
+  .about-grid { grid-template-columns: minmax(0, 1fr); }
+  .plans { grid-template-columns: minmax(0, 1fr); }
+  .plan, .plan:first-child, .plan:last-child { border-left: 0; padding: 22px 0 26px; }
+  .plan .for { max-width: 52ch; min-height: 0; }
 }
 @media (max-width: 680px) {
   .tabs2 { gap: 20px; } .tl-x { display: none; } .tab2[data-tab="post"] .tc { display: none; }
@@ -657,6 +691,10 @@ table.cmp { width: 100%; border-collapse: collapse; font-size: 14px; }
   .rv-quote { font-size: 17px; }
   .card-rv { padding: 18px; }
   .why-band { min-height: 520px; }
+  .about, .pricing { padding-top: 72px; }
+  .about-list { grid-template-columns: minmax(0, 1fr); }
+  .about-list li, .about-list li:nth-child(2n) { padding: 16px 0 20px; border-left: 0; }
+  .plan .price b { font-size: 46px; }
   .film-frame { border-radius: 12px; }
   .film-btn { right: 10px; top: 10px; padding: 6px 11px; font-size: 12.5px; }
   .sig-grid > div { padding: 12px 10px 13px; grid-template-columns: 20px minmax(0, 1fr); }
@@ -795,6 +833,7 @@ window.__CLEARSIGNAL_HOSTED = true;
     <a href="#check">The checker</a>
     <a href="#why">Why check</a>
     <a href="#signals">The 20 signals</a>
+    <a href="#pricing">Pricing</a>
   </nav>
   <button class="btn go" type="button" data-go="app">Check a post</button>
 </header>
@@ -890,6 +929,22 @@ window.__CLEARSIGNAL_HOSTED = true;
     </div>
   </section>
 
+  <section class="about" id="about" aria-labelledby="about-h">
+    <div class="in about-grid">
+      <div class="about-intro">
+        <span class="eyebrow">Why we built ClearSignal</span>
+        <h2 id="about-h">A correction takes hours. A share takes a second.</h2>
+        <p>We made ClearSignal for the Creathon “Truth in the Age of AI”, organised by GIPA and Hogeschool Leiden in Tbilisi, 2026. Our question was simple: what helps someone in the minute before they forward a post about war?</p>
+      </div>
+      <ol class="about-list">
+        <li><b>Fear travels faster than facts</b><span>In a war scare, posts built on fear, urgency and false choices spread further than the corrections that follow. Most people who share them mean well.</span></li>
+        <li><b>Fact checks often come too late</b><span>Fact-checkers do vital work, but a debunk usually appears after the post has gone round. ClearSignal brings what is already known to the moment of sharing: the sources, the dates and the first debunk.</span></li>
+        <li><b>People make the call</b><span>Claude scores the text and reads the sources, and every verdict shows the reasons behind it. Your team agrees, disagrees or changes each finding before anything is shared.</span></li>
+        <li><b>Made for everyday checking</b><span>For students and teachers, journalists, moderators of group chats and community pages, and anyone who wants to check before they share.</span></li>
+      </ol>
+    </div>
+  </section>
+
   <div class="in">
     <section class="signals" id="signals" aria-labelledby="sg-h">
       <div class="sec-head">
@@ -898,6 +953,53 @@ window.__CLEARSIGNAL_HOSTED = true;
       </div>
       <div class="sig-grid" id="sig-grid"></div>
       <details class="orig"><summary>How the original V8.3 sheet reads a total</summary><table id="orig"></table><p class="small" style="margin-top:10px" id="v83-note"></p></details>
+    </section>
+
+    <section class="pricing" id="pricing" aria-labelledby="pr-h">
+      <div class="sec-head">
+        <h2 id="pr-h">Pricing</h2>
+        <p>Free to start. Every check runs Claude and a live web search, which costs us about €0.08, so frequent checking needs a plan.</p>
+      </div>
+      <div class="plans">
+        <div class="plan">
+          <h3>Free</h3>
+          <p class="price"><b>€0</b></p>
+          <p class="for">For anyone who wants to check a post before they share it.</p>
+          <ul>
+            <li class="lead">3 checks a day</li>
+            <li>Live web fact check with real sources</li>
+            <li>The first debunk on a timeline</li>
+            <li>20 signals with exact quotes</li>
+            <li>Review and download a report</li>
+          </ul>
+          <button class="btn go" type="button" data-go="app">Check a post</button>
+        </div>
+        <div class="plan">
+          <h3>Pro</h3>
+          <p class="price"><b>€12</b><span>per month</span></p>
+          <p class="for">For journalists, students and moderators who check often.</p>
+          <ul>
+            <li class="lead">150 checks a month</li>
+            <li>Everything in Free</li>
+            <li>A history of your checks</li>
+            <li>Reports with your own notes and logo</li>
+          </ul>
+          <button class="btn" type="button" disabled>Coming soon</button>
+        </div>
+        <div class="plan">
+          <h3>Team</h3>
+          <p class="price"><b>€99</b><span>per month</span></p>
+          <p class="for">For newsrooms, classrooms and fact-check teams.</p>
+          <ul>
+            <li class="lead">1,500 checks a month</li>
+            <li>Up to 10 people</li>
+            <li>Review findings together</li>
+            <li>Shared reports for the whole team</li>
+          </ul>
+          <button class="btn" type="button" disabled>Coming soon</button>
+        </div>
+      </div>
+      <p class="small price-note">Prices exclude VAT. ClearSignal is in beta: until the paid plans launch, every check is free within a fair-use limit. Schools and non-profit newsrooms will get a discount.</p>
     </section>
   </div>
 </main>
